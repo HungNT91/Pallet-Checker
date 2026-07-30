@@ -4,8 +4,8 @@
 // (lấy trong Supabase Dashboard > Project Settings > API)
 // ============================================================
 const supabase = window.supabase.createClient(
-    'YOUR_PROJECT_URL',
-    'YOUR_ANON_KEY'
+    'https://wjexryzmwpencqgncstu.supabase.co',
+    'sb_publishable_yeuIIVepdABAC9TV5iMBAg_yQRukGLm'
 );
 
 let html5QrCode;
