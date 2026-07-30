@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Warehouse Manager - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- LOGIN PAGE -->
+    <div id="page-login" class="page active">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="material-icons-round">account_circle</span>
+            </div>
+            <h1>PALLET CHECKER</h1>
+            <p>Đăng nhập để tiếp tục vận hành</p>
+
+            <div class="input-group">
+                <label>Email nhân viên</label>
+                <span class="material-icons-round">alternate_email</span>
+                <input type="email" id="login-email" class="input-field" placeholder="email@fpt.com">
+            </div>
+
+            <div class="input-group">
+                <label>Mật khẩu</label>
+                <span class="material-icons-round">lock</span>
+                <input type="password" id="login-password" class="input-field" placeholder="••••••••">
+            </div>
+
+            <button class="login-btn" id="btn-login" onclick="handleLogin()">
+                ĐĂNG NHẬP
+            </button>
+        </div>
+
+        <div class="login-watermark">
+            © 2026 Nguyễn Tiến Hưng. All rights reserved.
+        </div>
+    </div>
+
+    <!-- HOME PAGE -->
+    <div id="page-home" class="page">
+        <header class="dashboard-header">
+            <div class="user-profile">
+                <div class="avatar">
+                    <!-- Standard placeholder matching the uploaded image style -->
+                    <img src="https://www.w3schools.com/howto/img_avatar.png" alt="Avatar"
+                        style="filter: brightness(1.2) contrast(1.2);">
+                </div>
+                <div class="user-info">
+                    <h2 id="user-name">Nguyễn Tiến Hưng - 00334</h2>
+                    <p id="user-dept">80001 - Tổng kho Miền Nam</p>
+                </div>
+                <div class="header-actions">
+                    <span class="material-icons-round" style="font-size: 1.8rem;">power_settings_new</span>
+                </div>
+            </div>
+            <div class="search-container">
+                <span class="material-icons-round" style="color: var(--primary-blue);">search</span>
+                <input type="text" placeholder="Tìm kiếm chức năng">
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- WAREHOUSE SECTION -->
+            <div class="accordion open" id="acc-warehouse">
+                <div class="accordion-header" onclick="toggleAccordion('acc-warehouse')">
+                    <span class="material-icons-round" style="color: var(--primary-blue)">warehouse</span>
+                    <span class="title">Vận hành kho</span>
+                    <span class="material-icons-round toggle">expand_more</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="feature-item" onclick="openHistory()">
+                        <div class="feature-icon-wrapper">
+                            <span class="material-icons-round"
+                                style="color: var(--primary-blue); font-size: 2rem;">sync_alt</span>
+                        </div>
+                        <span class="label">Luân chuyển<br>location</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PLACEHOLDERS -->
+            <div class="accordion" id="acc-inbound">
+                <div class="accordion-header" onclick="toggleAccordion('acc-inbound')">
+                    <span class="material-icons-round" style="color: #6366f1">swap_vertical_circle</span>
+                    <span class="title">Nhập - Xuất hàng</span>
+                    <span class="material-icons-round toggle">expand_more</span>
+                </div>
+                <div class="accordion-content">
+                    <p
+                        style="grid-column: span 4; font-size: 0.8rem; color: var(--text-dim); text-align: center; padding: 20px 0;">
+                        Chức năng đang phát triển</p>
+                </div>
+            </div>
+        </main>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active">
+                <span class="material-icons-round">dashboard</span>
+                <span>Trang chủ</span>
+            </div>
+            <div class="nav-item" onclick="alert('Chức năng tra cứu sẽ cập nhật sau')">
+                <span class="material-icons-round">manage_search</span>
+                <span>Tra cứu</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons-round">notifications_none</span>
+                <span>Thông báo</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons-round">account_circle</span>
+                <span>Nhân viên</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- HISTORY PAGE (LCNB) -->
+    <div id="page-history" class="page">
+        <header class="history-header">
+            <button onclick="goHome()" style="background:none; border:none; color:white;">
+                <span class="material-icons-round">arrow_back</span>
+            </button>
+            <h2>LCNB - Luân chuyển location</h2>
+            <button onclick="fetchHistory()" style="background:none; border:none; color:white;">
+                <span class="material-icons-round">refresh</span>
+            </button>
+        </header>
+
+        <div class="filter-row">
+            <select id="filter-dest" class="filter-select" onchange="applyFilters()">
+                <option value="">Vị trí đích: Tất cả</option>
+            </select>
+            <select id="filter-user" class="filter-select" onchange="applyFilters()">
+                <option value="">Người thực hiện: Tất cả</option>
+            </select>
+            <select id="filter-status" class="filter-select" onchange="applyFilters()">
+                <option value="">Trạng thái: Tất cả</option>
+                <option value="Chờ">Chờ</option>
+                <option value="Hoàn tất">Hoàn tất</option>
+            </select>
+        </div>
+
+        <main class="content" style="padding-top: 20px;" id="history-container">
+            <div id="history-list">
+                <!-- Data injected here -->
+                <div class="empty-section">Đang tải dữ liệu...</div>
+            </div>
+        </main>
+
+        <div class="fab" onclick="openScanner()">
+            <span class="material-icons-round">add</span>
+        </div>
+
+        <!-- Bottom nav duplicated here for consistency if needed, or just keep as is -->
+    </div>
+
+    <!-- SCANNER PAGE REDESIGN -->
+    <div id="page-scanner" class="hidden" style="background: white; flex-direction: column;">
+        <div class="scanner-header">
+            <button onclick="closeScanner()" style="background:none; border:none; color:white;">
+                <span class="material-icons-round">arrow_back</span>
+            </button>
+            <h3 id="scanner-title">Quét mã Pallet</h3>
+            <div style="width: 24px;"></div>
+        </div>
+
+        <div class="scanner-view-container">
+            <div id="reader-wrapper" style="width:100%; height:100%;">
+                <div id="reader" style="width:100%; height:100%;"></div>
+            </div>
+            <div class="scanner-frame" style="width: 200px; height: 200px; top: 50%; left: 50%;">
+                <div class="corner top-left" style="border-color: white; border-width: 5px;"></div>
+                <div class="corner top-right" style="border-color: white; border-width: 5px;"></div>
+                <div class="corner bottom-left" style="border-color: white; border-width: 5px;"></div>
+                <div class="corner bottom-right" style="border-color: white; border-width: 5px;"></div>
+                <div class="scan-line" style="background: white; box-shadow: 0 0 15px white;"></div>
+            </div>
+        </div>
+
+        <div class="scanner-footer">
+            <!-- Simple SVG Illustration similar to image -->
+            <div class="illustration">
+                <svg viewBox="0 0 200 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="50" y="30" width="100" height="70" rx="4" fill="#EBF5FF" />
+                    <rect x="70" y="45" width="20" height="20" fill="#3B82F6" opacity="0.3" />
+                    <rect x="95" y="45" width="35" height="4" fill="#3B82F6" opacity="0.4" />
+                    <rect x="95" y="55" width="25" height="4" fill="#3B82F6" opacity="0.4" />
+                    <rect x="95" y="65" width="30" height="4" fill="#3B82F6" opacity="0.4" />
+                    <path d="M140 85L160 110M160 110L145 125M160 110L175 125" stroke="#3B82F6" stroke-width="8"
+                        stroke-linecap="round" />
+                    <circle cx="160" cy="110" r="15" fill="#3B82F6" opacity="0.2" />
+                </svg>
+            </div>
+            <p id="scanner-footer-text">Vui lòng quét mã QR để thêm pallet hoặc vị trí</p>
+            <a class="manual-link" onclick="openManualInput()">hoặc điền vị trí chính xác</a>
+        </div>
+
+        <div class="scanner-bottom-bar">
+            <span id="scanner-bottom-icon" class="material-icons-round" style="font-size: 1.8rem;">pallet</span>
+            <span id="scanner-bottom-label">Quét pallet</span>
+        </div>
+    </div>
+
+    <!-- MANUAL INPUT SHEET -->
+    <div id="sheet-manual" class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <h3 style="margin-bottom: 20px; color: white;">Nhập số Pallet</h3>
+        <div class="manual-input-container">
+            <input type="text" id="manual-pallet-id" placeholder="VD: K01, T123" maxlength="6"
+                oninput="this.value = this.value.toUpperCase()">
+            <div id="manual-error" class="error-msg">Định dạng không hợp lệ (K01-K10000, T01-T10000)</div>
+        </div>
+        <button class="primary-btn" onclick="submitManualEntry()">
+            <span>XÁC NHẬN</span>
+            <span class="material-icons-round">check_circle</span>
+        </button>
+        <button class="primary-btn"
+            style="margin-top: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-dim);"
+            onclick="closeManualInput()">
+            HỦY BỎ
+        </button>
+    </div>
+
+    <!-- PALLET CONFIRMATION SHEET (Light Theme as per image) -->
+    <div id="sheet-pallet-confirm" class="bottom-sheet light-theme">
+        <div class="sheet-handle"></div>
+        <h2 class="sheet-title">Xác nhận chuyển pallet</h2>
+
+        <div class="confirm-box source-box">
+            <div class="box-header">
+                <span class="label">NGUỒN:</span>
+                <span class="material-icons-round icon">pallet</span>
+                <span class="value" id="conf-pallet-id">---</span>
+            </div>
+            <div class="box-row">
+                <span class="row-label">Vị trí:</span>
+                <span class="row-value" id="conf-source-loc">Đang cập nhật...</span>
+            </div>
+            <div class="box-row">
+                <span class="row-label">Tên khu:</span>
+                <span class="row-value" id="conf-source-zone">Đang cập nhật...</span>
+            </div>
+        </div>
+
+        <div class="confirm-box dest-box" onclick="openLocationPicker()">
+            <div class="box-header">
+                <span class="label">ĐÍCH: <span style="color:red">*</span></span>
+                <span class="material-icons-round icon" style="color: #f97316;">location_on</span>
+                <span class="value" id="conf-dest-id">Chọn vị trí đích</span>
+            </div>
+            <div class="box-row">
+                <span class="row-label">Vị trí:</span>
+                <span class="row-value" id="conf-dest-loc">---</span>
+            </div>
+            <div class="box-row">
+                <span class="row-label">Tên khu:</span>
+                <span class="row-value" id="conf-dest-zone">---</span>
+            </div>
+            <span class="material-icons-round select-arrow">expand_more</span>
+        </div>
+
+        <div class="sheet-actions">
+            <button class="secondary-btn" onclick="closePalletConfirm()">Hủy</button>
+            <button class="primary-btn-blue" id="btn-final-confirm" onclick="submitTransfer()" disabled>Xác
+                nhận</button>
+        </div>
+    </div>
+
+    <!-- LOCATION PICKER SHEET -->
+    <div id="sheet-location-picker" class="bottom-sheet light-theme">
+        <div class="sheet-handle"></div>
+        <h2 class="sheet-title">Chọn vị trí đích</h2>
+        <div class="search-box-light" style="display: flex; gap: 10px;">
+            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                <span class="material-icons-round">search</span>
+                <input type="text" id="loc-search" placeholder="Tìm kiếm vị trí..." oninput="filterLocations()"
+                    style="width: 100%;">
+            </div>
+            <button onclick="openScanner('DEST')"
+                style="background: var(--primary-blue); color: white; border: none; border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: center;">
+                <span class="material-icons-round">qr_code_scanner</span>
+            </button>
+        </div>
+        <div id="location-scroll-list" class="scroll-list">
+            <!-- Locations injected here -->
+            <div class="loading-spinner">Đang tải danh sách...</div>
+        </div>
+        <button class="secondary-btn" style="margin-top: 15px;" onclick="closeLocationPicker()">Đóng</button>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- SLIP CONFIRMATION MODAL -->
+    <div id="modal-slip" class="modal-overlay"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:400; display:none; align-items:center; justify-content:center; padding:20px;">
+        <div class="slip-container"
+            style="background:white; border-radius:20px; width:100%; max-width:320px; padding:30px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+            <div
+                style="width:60px; height:60px; background:#22c55e; border-radius:50%; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;">
+                <span class="material-icons-round" style="color:white; font-size:2.5rem;">check</span>
+            </div>
+            <h2 style="color:#111827; margin-bottom:10px;">Thành công!</h2>
+            <p style="color:#6b7280; font-size:0.9rem; margin-bottom:25px;">Pallet đã được cập nhật vị trí mới</p>
+
+            <div style="background:#f9fafb; border-radius:12px; padding:15px; margin-bottom:25px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:#6b7280; font-size:0.8rem;">Pallet:</span>
+                    <span style="color:#111827; font-weight:700;" id="slip-plt-id">---</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:#6b7280; font-size:0.8rem;">Vị trí đích:</span>
+                    <span style="color:#111827; font-weight:700;" id="slip-dest">---</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#6b7280; font-size:0.8rem;">Thời gian:</span>
+                    <span style="color:#111827; font-size:0.8rem;" id="slip-time">---</span>
+                </div>
+            </div>
+
+            <button class="primary-btn-blue" style="width:100%;" onclick="closeSlip()">HOÀN TẤT</button>
+        </div>
+    </div>
+
+    <!-- TICKET DETAIL MODAL -->
+    <div id="modal-ticket" class="modal-overlay"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:300; display:none; align-items:flex-end; justify-content:center;">
+        <div id="ticket-detail-container" class="bottom-sheet active"
+            style="position:relative; transform:translateY(0); max-height: 90vh; overflow-y: auto;">
+            <div class="ticket-detail-header">
+                <div
+                    style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border: 2px solid white; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-icons-round" style="color: white; font-size: 1.5rem;">logout</span>
+                </div>
+                <h2>XÁC NHẬN LUÂN CHUYỂN</h2>
+                <p>Vui lòng kiểm tra kỹ Pallet và Vị trí</p>
+            </div>
+
+            <div class="qr-section">
+                <div class="qr-item">
+                    <div id="qr-pallet" class="qr-box"></div>
+                    <span class="qr-label" id="label-pallet">---</span>
+                </div>
+                <div style="height: 60px; width: 1px; background: rgba(255,255,255,0.1);"></div>
+                <div class="qr-item">
+                    <div id="qr-dest" class="qr-box"></div>
+                    <span class="qr-label" id="label-dest">---</span>
+                </div>
+            </div>
+
+            <div class="detail-info-box">
+                <div class="detail-row">
+                    <span class="detail-label">Mã phiếu:</span>
+                    <span class="detail-value highlight" id="det-ticket-id">---</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Pallet:</span>
+                    <span class="detail-value" id="det-pallet-id">---</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Vị trí đích:</span>
+                    <span class="detail-value" id="det-dest-id">---</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Người luân chuyển:</span>
+                    <span class="detail-value" id="det-user">---</span>
+                </div>
+                <div class="detail-row" style="border:none">
+                    <span class="detail-label">Thời gian:</span>
+                    <span class="detail-value" id="det-time">---</span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button id="btn-close-det" class="primary-btn"
+                    style="flex: 1; padding: 12px; height: auto; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white;"
+                    onclick="closeTicketDetail()">ĐÓNG</button>
+                <button id="btn-confirm-det" class="primary-btn"
+                    style="flex: 2; padding: 12px; height: auto; background: #22c55e; display: none;"
+                    onclick="confirmCurrentTicket()">XÁC NHẬN</button>
+                <button id="btn-print-det" class="primary-btn" style="flex: 2; background: #f97316; display: none;"
+                    onclick="window.print()">IN PHIẾU</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
