@@ -1,9 +1,9 @@
-        // ============================================================
+// ============================================================
 // Supabase client
 // Thay YOUR_PROJECT_URL và YOUR_ANON_KEY bằng giá trị thật của bạn
 // (lấy trong Supabase Dashboard > Project Settings > API)
 // ============================================================
-const supabase = window.supabase.createClient(
+const sb = window.supabase.createClient(
     'https://wjexryzmwpencqgncstu.supabase.co',
     'sb_publishable_yeuIIVepdABAC9TV5iMBAg_yQRukGLm'
 );
@@ -41,7 +41,7 @@ let html5QrCode;
                 list.innerHTML = '<div class="empty-section">Đang tải dữ liệu...</div>';
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await sb
                 .from('transfer_history')
                 .select('*')
                 .order('created_at', { ascending: false });
@@ -205,7 +205,7 @@ let html5QrCode;
             btnConfirm.innerText = "ĐANG XỬ LÝ...";
             btnConfirm.disabled = true;
 
-            const { data: res, error } = await supabase.rpc('confirm_transfer_ticket', {
+            const { data: res, error } = await sb.rpc('confirm_transfer_ticket', {
                 p_ticket_id: currentTicketId,
                 p_staff_name: currentUser ? currentUser.name : 'Unknown'
             });
@@ -495,7 +495,7 @@ let html5QrCode;
             const list = document.getElementById('location-scroll-list');
             list.innerHTML = '<div class="loading-spinner">Đang tải danh sách...</div>';
 
-            const { data, error } = await supabase
+            const { data, error } = await sb
                 .from('locations')
                 .select('*')
                 .order('id');
@@ -564,7 +564,7 @@ let html5QrCode;
                 user: currentUser ? currentUser.name : 'Unknown' // Send user name
             };
 
-            const { data: res, error } = await supabase.rpc('save_pallet_action', {
+            const { data: res, error } = await sb.rpc('save_pallet_action', {
                 p_pallet_id: data.palletId,
                 p_dest_id: data.destId,
                 p_dest_name: data.destName,
@@ -616,7 +616,7 @@ let html5QrCode;
             btn.innerText = "ĐANG ĐĂNG NHẬP...";
             btn.disabled = true;
 
-            const { data: res, error } = await supabase.rpc('login', {
+            const { data: res, error } = await sb.rpc('login', {
                 p_email: email,
                 p_password: password
             });
