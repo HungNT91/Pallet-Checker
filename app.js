@@ -632,6 +632,7 @@ let html5QrCode;
             if (res.success) {
                 // Set User Profile
                 currentUser = res.user; // Store globally
+                localStorage.setItem('pallet_checker_user', JSON.stringify(res.user)); // Ghi nhớ phiên đăng nhập
                 document.getElementById('user-name').innerText = `${res.user.name} - ${res.user.email.split('@')[0]}`;
                 document.getElementById('user-dept').innerText = res.user.role;
 
@@ -648,7 +649,34 @@ let html5QrCode;
             }
         }
 
-        // Initialize user info (demo)
+        // --- Đăng xuất ---
+        function handleLogout() {
+            localStorage.removeItem('pallet_checker_user');
+            currentUser = null;
+            historyData = [];
+            allLocations = [];
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-password').value = '';
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-login').classList.add('active');
+        }
+
+        // Khôi phục phiên đăng nhập đã lưu (nếu có) khi tải lại trang
         window.onload = () => {
-            // Can be fetched from server
+            const saved = localStorage.getItem('pallet_checker_user');
+            if (saved) {
+                try {
+                    currentUser = JSON.parse(saved);
+                    document.getElementById('user-name').innerText = `${currentUser.name} - ${currentUser.email.split('@')[0]}`;
+                    document.getElementById('user-dept').innerText = currentUser.role;
+
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById('page-home').classList.add('active');
+
+                    fetchLocations();
+                    fetchHistory(true);
+                } catch (e) {
+                    localStorage.removeItem('pallet_checker_user');
+                }
+            }
         };
