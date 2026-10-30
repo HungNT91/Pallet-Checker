@@ -1,4 +1,4 @@
-// ============================================================
+        // ============================================================
 // Supabase client
 // Thay YOUR_PROJECT_URL và YOUR_ANON_KEY bằng giá trị thật của bạn
 // (lấy trong Supabase Dashboard > Project Settings > API)
@@ -374,44 +374,52 @@ let html5QrCode;
                 aspectRatio: 1.0
             };
 
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length) {
-                    // Try to find the back camera
-                    let cameraId = devices[0].id; // Default to first camera
-                    for (const device of devices) {
-                        if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment')) {
-                            cameraId = device.id;
-                            break;
-                        }
-                    }
-
-                    html5QrCode.start(cameraId, config, onScanSuccess)
-                        .then(() => {
-                            const track = html5QrCode.getRunningTrack();
-                            if (track && track.getCapabilities && track.getCapabilities().focusMode) {
-                                track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
+            // Dùng facingMode: "environment" trực tiếp — hoạt động đúng trên cả Android lẫn iOS Safari.
+            // Tránh getCameras() vì iOS Safari không trả label camera trước khi cấp quyền,
+            // dẫn đến việc chọn nhầm camera trước (user-facing).
+            html5QrCode.start(
+                { facingMode: { exact: "environment" } },
+                config,
+                onScanSuccess
+            ).then(() => {
+                // Bật autofocus liên tục nếu thiết bị hỗ trợ
+                const track = html5QrCode.getRunningTrack();
+                if (track && track.getCapabilities && track.getCapabilities().focusMode) {
+                    track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
+                }
+            }).catch(err => {
+                console.warn("Không thể dùng camera sau (exact), thử không dùng exact:", err);
+                // Fallback 1: facingMode không strict (một số thiết bị cũ không hỗ trợ exact)
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess
+                ).catch(err2 => {
+                    console.warn("Fallback facingMode environment thất bại:", err2);
+                    // Fallback 2: getCameras() cho Android cũ không hỗ trợ facingMode
+                    Html5Qrcode.getCameras().then(devices => {
+                        if (devices && devices.length) {
+                            let cameraId = devices[devices.length - 1].id; // Camera cuối thường là camera sau
+                            for (const device of devices) {
+                                if (device.label.toLowerCase().includes('back') ||
+                                    device.label.toLowerCase().includes('environment') ||
+                                    device.label.toLowerCase().includes('rear')) {
+                                    cameraId = device.id;
+                                    break;
+                                }
                             }
-                        })
-                        .catch(err => {
-                            console.error("Lỗi start camera: ", err);
-                            // Fallback to facingMode if cameraId fails
-                            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess).catch(e => {
+                            html5QrCode.start(cameraId, config, onScanSuccess).catch(e => {
                                 alert("Không thể khởi động camera: " + e);
                                 closeScanner();
                             });
-                        });
-                } else {
-                    // No cameras found or permission denied
-                    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess).catch(e => {
-                        alert("Không tìm thấy camera hoặc chưa cấp quyền!");
+                        } else {
+                            alert("Không tìm thấy camera hoặc chưa cấp quyền!");
+                            closeScanner();
+                        }
+                    }).catch(() => {
+                        alert("Lỗi truy cập camera. Vui lòng cấp quyền camera và thử lại.");
                         closeScanner();
                     });
-                }
-            }).catch(err => {
-                // Permission denied or other error
-                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess).catch(e => {
-                    alert("Lỗi truy cập camera: " + e);
-                    closeScanner();
                 });
             });
         }
@@ -632,7 +640,6 @@ let html5QrCode;
             if (res.success) {
                 // Set User Profile
                 currentUser = res.user; // Store globally
-                localStorage.setItem('pallet_checker_user', JSON.stringify(res.user)); // Ghi nhớ phiên đăng nhập
                 document.getElementById('user-name').innerText = `${res.user.name} - ${res.user.email.split('@')[0]}`;
                 document.getElementById('user-dept').innerText = res.user.role;
 
@@ -649,34 +656,7 @@ let html5QrCode;
             }
         }
 
-        // --- Đăng xuất ---
-        function handleLogout() {
-            localStorage.removeItem('pallet_checker_user');
-            currentUser = null;
-            historyData = [];
-            allLocations = [];
-            document.getElementById('login-email').value = '';
-            document.getElementById('login-password').value = '';
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-login').classList.add('active');
-        }
-
-        // Khôi phục phiên đăng nhập đã lưu (nếu có) khi tải lại trang
+        // Initialize user info (demo)
         window.onload = () => {
-            const saved = localStorage.getItem('pallet_checker_user');
-            if (saved) {
-                try {
-                    currentUser = JSON.parse(saved);
-                    document.getElementById('user-name').innerText = `${currentUser.name} - ${currentUser.email.split('@')[0]}`;
-                    document.getElementById('user-dept').innerText = currentUser.role;
-
-                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                    document.getElementById('page-home').classList.add('active');
-
-                    fetchLocations();
-                    fetchHistory(true);
-                } catch (e) {
-                    localStorage.removeItem('pallet_checker_user');
-                }
-            }
+            // Can be fetched from server
         };
