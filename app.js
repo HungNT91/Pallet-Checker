@@ -293,6 +293,7 @@ let html5QrCode;
         }
 
         async function closeScanner() {
+            closeManualInput();
             // Dừng scanner và dọn sạch instance (quan trọng trên iOS để giải phóng camera)
             if (html5QrCode) {
                 try { await html5QrCode.stop(); } catch (_) {}
@@ -309,6 +310,7 @@ let html5QrCode;
 
         // Thử lại camera — hữu ích khi iOS lần đầu không nhận được camera
         async function retryScanner() {
+            closeManualInput();
             if (html5QrCode) {
                 try { await html5QrCode.stop(); } catch (_) {}
                 try { html5QrCode.clear(); } catch (_) {}
@@ -321,15 +323,68 @@ let html5QrCode;
         }
 
         // --- Manual Entry Functions ---
+        let isManualInputActive = false;
+
         function openManualInput() {
-            document.getElementById('sheet-manual').classList.add('active');
-            document.getElementById('manual-pallet-id').focus();
+            isManualInputActive = true;
+
+            // Tạm dừng camera nếu đang quét để tránh giật lag / đứng bàn phím iOS và tránh quét nhầm khi đang gõ
+            if (html5QrCode) {
+                try {
+                    if (typeof html5QrCode.pause === 'function') {
+                        html5QrCode.pause(true);
+                    }
+                } catch (_) {}
+            }
+
+            const backdrop = document.getElementById('manual-backdrop');
+            if (backdrop) backdrop.style.display = 'block';
+
+            const sheet = document.getElementById('sheet-manual');
+            if (sheet) {
+                sheet.style.bottom = '0px';
+                sheet.classList.add('active');
+            }
+
+            // iOS WebKit fix: Tránh gọi .focus() ngay lập tức trong khi CSS transform đang chạy
+            // vì sẽ khiến bàn phím ảo iOS bị lệch toạ độ, đơ touch target hoặc treo input.
+            setTimeout(() => {
+                const input = document.getElementById('manual-pallet-id');
+                if (input) {
+                    input.focus();
+                }
+            }, 300);
         }
 
         function closeManualInput() {
-            document.getElementById('sheet-manual').classList.remove('active');
-            document.getElementById('manual-error').style.display = 'none';
-            document.getElementById('manual-pallet-id').value = '';
+            isManualInputActive = false;
+
+            const backdrop = document.getElementById('manual-backdrop');
+            if (backdrop) backdrop.style.display = 'none';
+
+            const sheet = document.getElementById('sheet-manual');
+            if (sheet) {
+                sheet.classList.remove('active');
+                sheet.style.bottom = '';
+            }
+
+            const errorDiv = document.getElementById('manual-error');
+            if (errorDiv) errorDiv.style.display = 'none';
+
+            const input = document.getElementById('manual-pallet-id');
+            if (input) {
+                input.value = '';
+                input.blur();
+            }
+
+            // Phục hồi lại camera khi đóng hộp thoại nhập thủ công
+            if (html5QrCode) {
+                try {
+                    if (typeof html5QrCode.resume === 'function') {
+                        html5QrCode.resume();
+                    }
+                } catch (_) {}
+            }
         }
 
         function validatePalletId(id) {
@@ -357,15 +412,16 @@ let html5QrCode;
         }
 
         function submitManualEntry() {
-            const val = document.getElementById('manual-pallet-id').value.trim();
+            const input = document.getElementById('manual-pallet-id');
+            const val = (input ? input.value : '').trim().toUpperCase();
             const errorDiv = document.getElementById('manual-error');
 
             if (validatePalletId(val)) {
-                errorDiv.style.display = 'none';
+                if (errorDiv) errorDiv.style.display = 'none';
                 closeManualInput();
                 onScanSuccess(val);
             } else {
-                errorDiv.style.display = 'block';
+                if (errorDiv) errorDiv.style.display = 'block';
             }
         }
 
@@ -466,6 +522,7 @@ let html5QrCode;
         }
 
         function onScanSuccess(decodedText) {
+            if (isManualInputActive) return;
             if (navigator.vibrate) navigator.vibrate(100);
 
             if (scanContext === 'PALLET') {
@@ -689,7 +746,31 @@ let html5QrCode;
             }
         }
 
-        // Initialize user info (demo)
+        // Initialize and mobile iOS virtual keyboard handling
         window.onload = () => {
-            // Can be fetched from server
+            // Lắng nghe sự kiện bàn phím ảo iOS (visualViewport) để tự động đẩy sheet nhập pallet lên trên bàn phím
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', () => {
+                    const sheet = document.getElementById('sheet-manual');
+                    if (sheet && sheet.classList.contains('active')) {
+                        const keyboardHeight = window.innerHeight - window.visualViewport.height;
+                        if (keyboardHeight > 80) {
+                            sheet.style.bottom = `${keyboardHeight}px`;
+                        } else {
+                            sheet.style.bottom = '0px';
+                        }
+                    }
+                });
+            }
+
+            // Cho phép nhấn Enter trên bàn phím ảo điện thoại để xác nhận
+            const manualInput = document.getElementById('manual-pallet-id');
+            if (manualInput) {
+                manualInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitManualEntry();
+                    }
+                });
+            }
         };
