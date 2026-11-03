@@ -1033,12 +1033,22 @@
         position: relative;
     }
 
+    #sheet-pallet-confirm {
+        z-index: 115;
+    }
+
+    #sheet-location-picker {
+        z-index: 130;
+    }
+
     .confirm-box.dest-box {
         cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
     }
 
     .confirm-box.dest-box:active {
-        background: #f9fafb;
+        background: #f3f4f6;
     }
 
     .box-header {
@@ -1149,6 +1159,7 @@
     .scroll-list {
         max-height: 40vh;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
         border: 1px solid #f3f4f6;
         border-radius: 10px;
     }
@@ -1161,6 +1172,14 @@
         gap: 4px;
         cursor: pointer;
         text-align: left;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(59, 130, 246, 0.15);
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .location-item * {
+        pointer-events: none;
     }
 
     .location-item:last-child {
@@ -1168,7 +1187,7 @@
     }
 
     .location-item:active {
-        background: #f9fafb;
+        background: #e0f2fe;
     }
 
     .loc-id {
