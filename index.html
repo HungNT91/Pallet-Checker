@@ -60,7 +60,7 @@
                     <p id="user-dept">80001 - Tổng kho Miền Nam</p>
                 </div>
                 <div class="header-actions">
-                    <span class="material-icons-round" style="font-size: 1.8rem; cursor: pointer;" onclick="handleLogout()">power_settings_new</span>
+                    <span class="material-icons-round" style="font-size: 1.8rem;">power_settings_new</span>
                 </div>
             </div>
             <div class="search-container">
@@ -201,7 +201,10 @@
                 </svg>
             </div>
             <p id="scanner-footer-text">Vui lòng quét mã QR để thêm pallet hoặc vị trí</p>
-            <a class="manual-link" onclick="openManualInput()">hoặc điền vị trí chính xác</a>
+            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+                <a class="manual-link" onclick="openManualInput()">hoặc điền thủ công</a>
+                <a class="manual-link" style="color:#f97316;" onclick="retryScanner()">↺ Thử lại camera</a>
+            </div>
         </div>
 
         <div class="scanner-bottom-bar">
