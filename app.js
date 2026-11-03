@@ -547,14 +547,30 @@ let html5QrCode;
         }
 
         async function handleDestScan(decodedText) {
-            // Check if scanned text corresponds to a valid location in allLocations
-            let found = allLocations.find(loc => String(loc.id).toUpperCase() === String(decodedText).toUpperCase());
+            const cleanText = String(decodedText || '').trim().toUpperCase();
+            if (!cleanText) return;
+
+            // Nếu danh sách vị trí chưa tải kịp, lấy ngay từ server
+            if (!allLocations || allLocations.length === 0) {
+                try {
+                    const { data } = await sb.from('locations').select('*').order('id');
+                    if (data && data.length > 0) {
+                        allLocations = data;
+                    }
+                } catch (_) {}
+            }
+
+            // Tìm vị trí tương ứng theo ID hoặc Tên vị trí (hỗ trợ so khớp chính xác sau khi trim)
+            let found = allLocations.find(loc =>
+                String(loc.id).trim().toUpperCase() === cleanText ||
+                String(loc.name).trim().toUpperCase() === cleanText
+            );
 
             if (found) {
                 await closeScanner();
                 selectLocation(found);
             } else {
-                showToast("Vị trí không tồn tại trong danh sách!");
+                showToast("Vị trí không tồn tại: " + cleanText);
                 await closeScanner();
             }
         }
@@ -563,8 +579,18 @@ let html5QrCode;
         let selectedLocation = null;
 
         function openLocationPicker() {
-            document.getElementById('sheet-location-picker').classList.add('active');
-            if (allLocations.length === 0) {
+            const sheet = document.getElementById('sheet-location-picker');
+            if (sheet) {
+                sheet.style.bottom = '0px';
+                sheet.classList.add('active');
+            }
+
+            const searchInput = document.getElementById('loc-search');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+
+            if (!allLocations || allLocations.length === 0) {
                 fetchLocations();
             } else {
                 renderLocationList(allLocations);
@@ -572,7 +598,15 @@ let html5QrCode;
         }
 
         function closeLocationPicker() {
-            document.getElementById('sheet-location-picker').classList.remove('active');
+            const searchInput = document.getElementById('loc-search');
+            if (searchInput) {
+                searchInput.blur();
+            }
+            const sheet = document.getElementById('sheet-location-picker');
+            if (sheet) {
+                sheet.classList.remove('active');
+                sheet.style.bottom = '';
+            }
         }
 
         function closePalletConfirm() {
@@ -591,7 +625,9 @@ let html5QrCode;
 
         async function fetchLocations() {
             const list = document.getElementById('location-scroll-list');
-            list.innerHTML = '<div class="loading-spinner">Đang tải danh sách...</div>';
+            if (list) {
+                list.innerHTML = '<div class="loading-spinner">Đang tải danh sách...</div>';
+            }
 
             const { data, error } = await sb
                 .from('locations')
@@ -599,27 +635,41 @@ let html5QrCode;
                 .order('id');
 
             if (error) {
-                list.innerHTML = `<div class="loading-spinner">Lỗi tải dữ liệu: ${error.message}</div>`;
+                if (list) {
+                    list.innerHTML = `<div class="loading-spinner" style="color:#ef4444">Lỗi tải dữ liệu: ${error.message}</div>`;
+                }
                 return;
             }
 
-            allLocations = data;
-            renderLocationList(data);
+            allLocations = data || [];
+            renderLocationList(allLocations);
         }
 
         function renderLocationList(data) {
             const list = document.getElementById('location-scroll-list');
+            if (!list) return;
             list.innerHTML = '';
 
             if (!data || data.length === 0) {
-                list.innerHTML = '<div class="loading-spinner">Không có dữ liệu</div>';
+                list.innerHTML = '<div class="loading-spinner">Không có dữ liệu vị trí</div>';
                 return;
             }
 
             data.forEach(loc => {
                 const div = document.createElement('div');
                 div.className = 'location-item';
-                div.onclick = () => selectLocation(loc);
+                div.setAttribute('role', 'button');
+                div.setAttribute('tabindex', '0');
+
+                // Hỗ trợ chọn mượt mà trên iOS Safari
+                const onSelect = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectLocation(loc);
+                };
+
+                div.addEventListener('click', onSelect);
+
                 div.innerHTML = `
                     <div class="loc-id">${loc.id}</div>
                     <div class="loc-zone">${loc.name}</div>
@@ -629,10 +679,10 @@ let html5QrCode;
         }
 
         function filterLocations() {
-            const query = document.getElementById('loc-search').value.toLowerCase();
+            const query = (document.getElementById('loc-search').value || '').trim().toLowerCase();
             const filtered = allLocations.filter(loc =>
-                loc.id.toLowerCase().includes(query) ||
-                loc.name.toLowerCase().includes(query)
+                String(loc.id).toLowerCase().includes(query) ||
+                String(loc.name).toLowerCase().includes(query)
             );
             renderLocationList(filtered);
         }
@@ -642,6 +692,9 @@ let html5QrCode;
             document.getElementById('conf-dest-id').innerText = loc.id;
             document.getElementById('conf-dest-loc').innerText = loc.id;
             document.getElementById('conf-dest-zone').innerText = loc.name;
+
+            const searchInput = document.getElementById('loc-search');
+            if (searchInput) searchInput.blur();
 
             document.getElementById('btn-final-confirm').disabled = false;
             closeLocationPicker();
@@ -748,18 +801,21 @@ let html5QrCode;
 
         // Initialize and mobile iOS virtual keyboard handling
         window.onload = () => {
-            // Lắng nghe sự kiện bàn phím ảo iOS (visualViewport) để tự động đẩy sheet nhập pallet lên trên bàn phím
+            // Tải trước danh sách vị trí trong nền để khi mở picker hoặc quét vị trí là có ngay
+            fetchLocations();
+
+            // Lắng nghe sự kiện bàn phím ảo iOS (visualViewport) để tự động đẩy sheet đang active lên trên bàn phím
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', () => {
-                    const sheet = document.getElementById('sheet-manual');
-                    if (sheet && sheet.classList.contains('active')) {
-                        const keyboardHeight = window.innerHeight - window.visualViewport.height;
+                    const keyboardHeight = window.innerHeight - window.visualViewport.height;
+                    const activeSheets = document.querySelectorAll('.bottom-sheet.active');
+                    activeSheets.forEach(sheet => {
                         if (keyboardHeight > 80) {
                             sheet.style.bottom = `${keyboardHeight}px`;
                         } else {
                             sheet.style.bottom = '0px';
                         }
-                    }
+                    });
                 });
             }
 
