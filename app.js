@@ -292,28 +292,32 @@ let html5QrCode;
             startScanner();
         }
 
-        function closeScanner() {
+        async function closeScanner() {
+            // Dừng scanner và dọn sạch instance (quan trọng trên iOS để giải phóng camera)
             if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('page-scanner').classList.add('hidden');
-                    document.getElementById('page-scanner').style.display = 'none';
-                    if (scanContext === 'DEST') {
-                        document.getElementById('sheet-pallet-confirm').classList.add('active');
-                    }
-                }).catch(() => {
-                    document.getElementById('page-scanner').classList.add('hidden');
-                    document.getElementById('page-scanner').style.display = 'none';
-                    if (scanContext === 'DEST') {
-                        document.getElementById('sheet-pallet-confirm').classList.add('active');
-                    }
-                });
-            } else {
-                document.getElementById('page-scanner').classList.add('hidden');
-                document.getElementById('page-scanner').style.display = 'none';
-                if (scanContext === 'DEST') {
-                    document.getElementById('sheet-pallet-confirm').classList.add('active');
-                }
+                try { await html5QrCode.stop(); } catch (_) {}
+                try { html5QrCode.clear(); } catch (_) {}
+                html5QrCode = null;
             }
+            document.getElementById('page-scanner').classList.add('hidden');
+            document.getElementById('page-scanner').style.display = 'none';
+            // Khi user bấm Back thủ công, restore sheet pallet nếu đang quét DEST
+            if (scanContext === 'DEST') {
+                document.getElementById('sheet-pallet-confirm').classList.add('active');
+            }
+        }
+
+        // Thử lại camera — hữu ích khi iOS lần đầu không nhận được camera
+        async function retryScanner() {
+            if (html5QrCode) {
+                try { await html5QrCode.stop(); } catch (_) {}
+                try { html5QrCode.clear(); } catch (_) {}
+                html5QrCode = null;
+            }
+            // Xóa nội dung reader để tránh lỗi "element already in use"
+            const reader = document.getElementById('reader');
+            if (reader) reader.innerHTML = '';
+            await startScanner();
         }
 
         // --- Manual Entry Functions ---
@@ -366,62 +370,99 @@ let html5QrCode;
         }
 
         // --- Scanner Logic ---
-        function startScanner() {
-            html5QrCode = new Html5Qrcode("reader");
+        // iOS Safari quirks:
+        // 1. facingMode: { exact: "environment" } có thể lỗi trên iOS cũ/iPad → dùng fallback chain với instance mới
+        // 2. Phải tạo instance Html5Qrcode MỚI mỗi lần start (không tái dùng instance đã lỗi)
+        // 3. fps thấp (10) ổn định hơn trên iOS
+        // 4. Autofocus continuous giúp nhận mã nhanh hơn
+
+        async function startScanner() {
+            // Đảm bảo instance cũ đã được dọn sạch
+            if (html5QrCode) {
+                try { await html5QrCode.stop(); } catch (_) {}
+                try { html5QrCode.clear(); } catch (_) {}
+                html5QrCode = null;
+            }
+
             const config = {
-                fps: 20,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+                fps: 10,                          // iOS ổn định hơn với fps thấp
+                qrbox: { width: 220, height: 220 },
+                aspectRatio: 1.0,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true  // Dùng native BarcodeDetector API nếu có (nhanh hơn)
+                }
             };
 
-            // Dùng facingMode: "environment" trực tiếp — hoạt động đúng trên cả Android lẫn iOS Safari.
-            // Tránh getCameras() vì iOS Safari không trả label camera trước khi cấp quyền,
-            // dẫn đến việc chọn nhầm camera trước (user-facing).
-            html5QrCode.start(
+            // Thứ tự ưu tiên constraint cho iOS & Android:
+            // [1] exact environment → [2] environment (không strict) → [3] getCameras() chọn camera cuối
+            const cameraConstraints = [
                 { facingMode: { exact: "environment" } },
-                config,
-                onScanSuccess
-            ).then(() => {
-                // Bật autofocus liên tục nếu thiết bị hỗ trợ
-                const track = html5QrCode.getRunningTrack();
-                if (track && track.getCapabilities && track.getCapabilities().focusMode) {
-                    track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
-                }
-            }).catch(err => {
-                console.warn("Không thể dùng camera sau (exact), thử không dùng exact:", err);
-                // Fallback 1: facingMode không strict (một số thiết bị cũ không hỗ trợ exact)
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    onScanSuccess
-                ).catch(err2 => {
-                    console.warn("Fallback facingMode environment thất bại:", err2);
-                    // Fallback 2: getCameras() cho Android cũ không hỗ trợ facingMode
-                    Html5Qrcode.getCameras().then(devices => {
-                        if (devices && devices.length) {
-                            let cameraId = devices[devices.length - 1].id; // Camera cuối thường là camera sau
-                            for (const device of devices) {
-                                if (device.label.toLowerCase().includes('back') ||
-                                    device.label.toLowerCase().includes('environment') ||
-                                    device.label.toLowerCase().includes('rear')) {
-                                    cameraId = device.id;
-                                    break;
-                                }
+                { facingMode: "environment" }
+            ];
+
+            for (let i = 0; i < cameraConstraints.length; i++) {
+                try {
+                    // Tạo instance MỚI cho mỗi lần thử — tránh trạng thái lỗi còn sót
+                    html5QrCode = new Html5Qrcode("reader");
+                    await html5QrCode.start(cameraConstraints[i], config, onScanSuccess);
+
+                    // Bật continuous autofocus nếu thiết bị hỗ trợ (cải thiện nhận QR khi di chuyển)
+                    try {
+                        const track = html5QrCode.getRunningTrack();
+                        if (track && track.getCapabilities) {
+                            const caps = track.getCapabilities();
+                            if (caps.focusMode && caps.focusMode.includes("continuous")) {
+                                await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
                             }
-                            html5QrCode.start(cameraId, config, onScanSuccess).catch(e => {
-                                alert("Không thể khởi động camera: " + e);
-                                closeScanner();
-                            });
-                        } else {
-                            alert("Không tìm thấy camera hoặc chưa cấp quyền!");
-                            closeScanner();
                         }
-                    }).catch(() => {
-                        alert("Lỗi truy cập camera. Vui lòng cấp quyền camera và thử lại.");
-                        closeScanner();
-                    });
-                });
-            });
+                    } catch (_) { /* autofocus optional */ }
+
+                    return; // Thành công → dừng vòng lặp
+                } catch (err) {
+                    console.warn(`Camera constraint [${i}] thất bại:`, err);
+                    // Dọn instance lỗi trước khi thử lại
+                    try { html5QrCode && html5QrCode.clear(); } catch (_) {}
+                    html5QrCode = null;
+                }
+            }
+
+            // Fallback cuối: getCameras() → chọn camera sau theo index hoặc label
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                if (!devices || devices.length === 0) {
+                    alert("Không tìm thấy camera hoặc chưa cấp quyền!");
+                    closeScanner();
+                    return;
+                }
+
+                // Ưu tiên camera có label 'back', 'environment', 'rear'; nếu không có thì dùng camera cuối
+                let cameraId = devices[devices.length - 1].id;
+                for (const device of devices) {
+                    const lbl = (device.label || '').toLowerCase();
+                    if (lbl.includes('back') || lbl.includes('environment') || lbl.includes('rear')) {
+                        cameraId = device.id;
+                        break;
+                    }
+                }
+
+                html5QrCode = new Html5Qrcode("reader");
+                await html5QrCode.start(cameraId, config, onScanSuccess);
+
+                try {
+                    const track = html5QrCode.getRunningTrack();
+                    if (track && track.getCapabilities) {
+                        const caps = track.getCapabilities();
+                        if (caps.focusMode && caps.focusMode.includes("continuous")) {
+                            await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                        }
+                    }
+                } catch (_) {}
+
+            } catch (finalErr) {
+                console.error("Không thể khởi động camera:", finalErr);
+                alert("Lỗi truy cập camera. Vui lòng cấp quyền camera và thử lại.");
+                closeScanner();
+            }
         }
 
         function onScanSuccess(decodedText) {
@@ -434,7 +475,7 @@ let html5QrCode;
             }
         }
 
-        function handlePalletScan(decodedText) {
+        async function handlePalletScan(decodedText) {
             if (currentPalletId === decodedText) return;
             currentPalletId = decodedText;
 
@@ -443,29 +484,21 @@ let html5QrCode;
             document.getElementById('conf-source-loc').innerText = '---';
             document.getElementById('conf-source-zone').innerText = '---';
 
-            html5QrCode.stop().then(() => {
-                document.getElementById('page-scanner').classList.add('hidden');
-                document.getElementById('page-scanner').style.display = 'none';
-                document.getElementById('sheet-pallet-confirm').classList.add('active');
-            });
+            // Dùng closeScanner() async để đảm bảo camera được giải phóng đúng cách trên iOS
+            await closeScanner();
+            document.getElementById('sheet-pallet-confirm').classList.add('active');
         }
 
-        function handleDestScan(decodedText) {
+        async function handleDestScan(decodedText) {
             // Check if scanned text corresponds to a valid location in allLocations
             let found = allLocations.find(loc => String(loc.id).toUpperCase() === String(decodedText).toUpperCase());
 
             if (found) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('page-scanner').classList.add('hidden');
-                    document.getElementById('page-scanner').style.display = 'none';
-                    selectLocation(found);
-                });
+                await closeScanner();
+                selectLocation(found);
             } else {
                 showToast("Vị trí không tồn tại trong danh sách!");
-                html5QrCode.stop().then(() => {
-                    document.getElementById('page-scanner').classList.add('hidden');
-                    document.getElementById('page-scanner').style.display = 'none';
-                });
+                await closeScanner();
             }
         }
 
