@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Warehouse Manager - Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
@@ -213,13 +213,15 @@
         </div>
     </div>
 
-    <!-- MANUAL INPUT SHEET -->
+    <!-- MANUAL INPUT BACKDROP & SHEET -->
+    <div id="manual-backdrop" onclick="closeManualInput()" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:105; display:none; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);"></div>
     <div id="sheet-manual" class="bottom-sheet">
         <div class="sheet-handle"></div>
         <h3 style="margin-bottom: 20px; color: white;">Nhập số Pallet</h3>
         <div class="manual-input-container">
             <input type="text" id="manual-pallet-id" placeholder="VD: K01, T123" maxlength="6"
-                oninput="this.value = this.value.toUpperCase()">
+                autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false"
+                enterkeyhint="done">
             <div id="manual-error" class="error-msg">Định dạng không hợp lệ (K01-K10000, T01-T10000)</div>
         </div>
         <button class="primary-btn" onclick="submitManualEntry()">
